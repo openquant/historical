@@ -5,6 +5,11 @@ import java.time.ZonedDateTime
 import scala.concurrent.Future
 import com.larroy.quant.common.{Contract, Resolution, Bar}
 
+/**
+  * Interface to plug-in different data providers and sources of historical data
+  *
+  * Providers of historical data can implement this interface.
+  */
 trait QuoteProvider extends Closeable {
   def name = "<unknown>"
   def connected: Boolean
