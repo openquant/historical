@@ -2,7 +2,11 @@ lazy val commonSettings = Seq (
     version := "0.1",
     organization := "openquant",
     scalaVersion := "2.11.7",
-    scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-encoding", "utf8")
+    scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-encoding", "utf8"),
+    resolvers ++= Seq(
+        Resolver.sonatypeRepo("releases"),
+        Resolver.sonatypeRepo("snapshots")
+    )
 )
 
 lazy val testDependencies = Seq(
@@ -29,7 +33,7 @@ lazy val yahooquoteprovider = project.in(file("yahooquoteprovider"))
     .settings(libraryDependencies ++= commonDependencies)
     .settings(libraryDependencies ++= {
             Seq(
-                "openquant" %% "yahoofinancescala" % "0.+"
+                "com.larroy.openquant" %% "yahoofinancescala" % "0.2"
             )
         }
     )

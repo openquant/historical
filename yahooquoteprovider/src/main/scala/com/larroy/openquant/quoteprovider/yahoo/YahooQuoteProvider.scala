@@ -67,7 +67,7 @@ class YahooQuoteProvider(implicit val ec: ExecutionContext) extends QuoteProvide
       val fundamentals = xs.head
       fundamentals.looksValid match {
         case true ⇒ Future.successful(fundamentals.name)
-        case false ⇒ Future.failed(new RuntimeException("No such contract"))
+        case false ⇒ Future.failed(new RuntimeException(s"No such contract: $contract"))
       }
     }
   }
