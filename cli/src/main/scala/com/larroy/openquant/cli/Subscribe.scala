@@ -80,37 +80,3 @@ object Subscribe extends Logging {
     \/-(Unit)
   }
 }
-
-
-//stockSource
-//implicit val ec = ThrottlingExecutionContext(5, 2)
-/*
-implicit val ec = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(5))
-val quoteProviderDis = for {
-  quoteProviderFactory ← QuoteProviderFactoryLoader(options.source)
-  quoteProvider = quoteProviderFactory(ec)
-} yield quoteProvider
-
-if (quoteProviderDis.isLeft)
-  return quoteProviderDis.map(_ ⇒ Unit)
-
-val quoteProvider = quoteProviderDis.toOption.get
-val quoteDB = QuoteDB(options.quoteDBUrl)
-stockList.foreach { stockInfo ⇒
-  val contract = Contract(stockInfo.ticker, options.contractType, options.exchange, options.currency, options.maybeExpiry)
-  if (quoteDB.subscription(contract, options.resolution).isLeft) {
-    // no subscription found
-    Await.result(quoteProvider.available(contract, options.resolution), Duration(10, SECONDS))
-      quoteDB.subscribe(contract, options.resolution, options.source) match {
-        case -\/(e) ⇒
-          log.error("Subscribe error $e")
-
-        case _ ⇒
-          log.info(s"Subscribed to ${contract}")
-      }
-    }(scala.concurrent.ExecutionContext.Implicits.global)
-  } else {
-    log.info(s"Already subscribed to ${contract}")
-  }
-}
-*/
