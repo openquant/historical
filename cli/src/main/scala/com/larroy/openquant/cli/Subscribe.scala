@@ -1,19 +1,14 @@
 package com.larroy.openquant.cli
 
-import java.util.Date
-import java.util.concurrent.{Executors, Future, ThreadPoolExecutor}
-
 import akka.actor.ActorSystem
 import com.larroy.openquant.quoteprovider.QuoteProviderFactoryLoader
-import com.larroy.openquant.symbols.{Exchange, Symbols}
+import com.larroy.openquant.symbols.{Exchange, StockInfo, Symbols}
 import com.larroy.quant.common._
-import com.larroy.quant.common.utils.{SameThreadExecutionContext, ThrottlingExecutionContext}
+import com.larroy.quant.common.utils.ThrottlingExecutionContext
 import com.larroy.quant.quotedb._
-import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 import scalaz.{-\/, \/, \/-}
 
 //import scalaz._
@@ -22,9 +17,17 @@ import akka.stream._
 import akka.stream.scaladsl._
 
 
-/**
-  * @author piotr 24.05.15
-  */
+trait SubscriptionStatus {
+  val contract: Contract
+}
+
+case class SubscriptionSuccess(override val contract: Contract) extends SubscriptionStatus
+
+case class AlreadySubscribed(override val contract: Contract) extends SubscriptionStatus
+
+case class SubscriptionFailure(override val contract: Contract, msg: String) extends SubscriptionStatus
+
+
 object Subscribe extends Logging {
   def apply(options: Options): Throwable \/ Unit = {
     val quoteDB = QuoteDB(options.quoteDBUrl)
@@ -40,8 +43,13 @@ object Subscribe extends Logging {
   def all(options: Options): Throwable \/ Unit = {
     import DisjunctionValues.convertDisjunctionToDisjunctionated
     implicit val system = ActorSystem("QuickStart")
-    implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher
+
+    val decider: Supervision.Decider = {
+      case _ ⇒ Supervision.Resume
+    }
+    implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(decider))
+
 
     val quoteProviderDis = for {
       quoteProviderFactory ← QuoteProviderFactoryLoader(options.source)
@@ -55,28 +63,27 @@ object Subscribe extends Logging {
 
     val stockList = Symbols.listExchange(Exchange.NYSE)
     val stockSource = Source(stockList)
-    val res = stockSource.map { stockInfo ⇒
-      log.debug(s"Process: $stockInfo")
+    def subscribe(stockInfo: StockInfo): Future[SubscriptionStatus] = {
       val contract = Contract(stockInfo.ticker, options.contractType, options.exchange, options.currency, options.maybeExpiry)
       if (quoteDB.subscription(contract, options.resolution).isLeft) {
-        Await.ready(quoteProvider.available(contract, options.resolution), Duration(10, SECONDS)).value.get match {
-          case Success(x) ⇒
-            quoteDB.subscribe(contract, options.resolution, options.source) match {
-              case -\/(e) ⇒
-                log.error("Subscribe error $e")
-
-              case _ ⇒
-                log.info(s"Subscribed to ${contract}")
-            }
-          case Failure(e) ⇒
-            log.error(s"contract not available: $e")
+        quoteProvider.available(contract, options.resolution).map { x ⇒
+          quoteDB.subscribe(contract, options.resolution, options.source) match {
+            case \/-(_) ⇒
+              SubscriptionSuccess(contract)
+            case -\/(e) ⇒
+              SubscriptionFailure(contract, e.getMessage)
+          }
         }
+      } else {
+        Future.successful(AlreadySubscribed(contract))
       }
-      stockInfo
     }
+    val res = stockSource.mapAsyncUnordered(10)(subscribe)
     val r = res.runForeach(x ⇒ log.debug(s"$x"))
     Await.result(r, Duration.Inf)
     log.debug("done")
+    materializer.shutdown()
+    system.terminate()
     \/-(Unit)
   }
 }
