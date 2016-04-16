@@ -25,9 +25,10 @@ object Symbols {
     rdr.toStream.drop(1).map(parseCSVLine).toVector
   }
 
-  def parseCSVLine(x: List[String]): StockInfo = {
-    val IPOyear = Try(x(4).toInt).toOption
-    new StockInfo(x(0), x(1), getCapMill(x(3)), IPOyear, x(5), x(6), x(7))
+  def parseCSVLine(cols: List[String]): StockInfo = {
+    val xs = cols.map { _.trim }
+    val IPOyear = Try(xs(4).toInt).toOption
+    new StockInfo(xs(0), xs(1), getCapMill(xs(3)), IPOyear, xs(5), xs(6), xs(7))
   }
 
   /// Capitalization from $13.B or $512.5M or n/a in Millions
